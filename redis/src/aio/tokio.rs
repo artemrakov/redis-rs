@@ -19,6 +19,8 @@ use native_tls::TlsConnector;
 #[cfg(feature = "tls-rustls")]
 use crate::connection::create_rustls_config;
 #[cfg(feature = "tls-rustls")]
+use crate::tls::TlsConfigRustls;
+#[cfg(feature = "tls-rustls")]
 use std::sync::Arc;
 #[cfg(feature = "tls-rustls")]
 use tokio_rustls::{client::TlsStream, TlsConnector};
@@ -62,7 +64,7 @@ pub(crate) enum Tokio {
     Tcp(TcpStreamTokio),
     /// Represents a Tokio TLS encrypted TCP connection
     #[cfg(any(feature = "tokio-native-tls-comp", feature = "tokio-rustls-comp"))]
-    TcpTls(Box<TlsStream<TcpStreamTokio>>),
+    TcpTls(TlsStream<TcpStreamTokio>),
     /// Represents a Tokio Unix connection.
     #[cfg(unix)]
     Unix(UnixStreamTokio),
@@ -126,46 +128,43 @@ impl RedisRuntime for Tokio {
         Ok(connect_tcp(&socket_addr).await.map(Tokio::Tcp)?)
     }
 
-    #[cfg(all(feature = "tls-native-tls", not(feature = "tls-rustls")))]
-    async fn connect_tcp_tls(
-        hostname: &str,
-        socket_addr: SocketAddr,
-        insecure: bool,
-        _: &Option<TlsConnParams>,
-    ) -> RedisResult<Self> {
-        let tls_connector: tokio_native_tls::TlsConnector = if insecure {
-            TlsConnector::builder()
-                .danger_accept_invalid_certs(true)
-                .danger_accept_invalid_hostnames(true)
-                .use_sni(false)
-                .build()?
-        } else {
-            TlsConnector::new()?
-        }
-        .into();
-        Ok(tls_connector
-            .connect(hostname, connect_tcp(&socket_addr).await?)
-            .await
-            .map(|con| Tokio::TcpTls(Box::new(con)))?)
-    }
+    // #[cfg(all(feature = "tls-native-tls", not(feature = "tls-rustls")))]
+    // async fn connect_tcp_tls(
+    //     hostname: &str,
+    //     socket_addr: SocketAddr,
+    //     insecure: bool,
+    //     _: &Option<TlsConnParams>,
+    // ) -> RedisResult<Self> {
+    //     let tls_connector: tokio_native_tls::TlsConnector = if insecure {
+    //         TlsConnector::builder()
+    //             .danger_accept_invalid_certs(true)
+    //             .danger_accept_invalid_hostnames(true)
+    //             .use_sni(false)
+    //             .build()?
+    //     } else {
+    //         TlsConnector::new()?
+    //     }
+    //     .into();
+    //     Ok(tls_connector
+    //         .connect(hostname, connect_tcp(&socket_addr).await?)
+    //         .await
+    //         .map(|con| Tokio::TcpTls(con))?)
+    // }
 
     #[cfg(feature = "tls-rustls")]
     async fn connect_tcp_tls(
         hostname: &str,
         socket_addr: SocketAddr,
-        insecure: bool,
-        tls_params: &Option<TlsConnParams>,
+        cfg: &TlsConfigRustls,
     ) -> RedisResult<Self> {
-        let config = create_rustls_config(insecure, tls_params.clone())?;
-        let tls_connector = TlsConnector::from(Arc::new(config));
-
-        Ok(tls_connector
+        Ok(cfg
+            .connector
             .connect(
                 rustls_pki_types::ServerName::try_from(hostname)?.to_owned(),
                 connect_tcp(&socket_addr).await?,
             )
             .await
-            .map(|con| Tokio::TcpTls(Box::new(con)))?)
+            .map(|con| Tokio::TcpTls(con))?)
     }
 
     #[cfg(unix)]

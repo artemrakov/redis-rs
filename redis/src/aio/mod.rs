@@ -34,12 +34,11 @@ pub(crate) trait RedisRuntime: AsyncStream + Send + Sync + Sized + 'static {
     async fn connect_tcp(socket_addr: SocketAddr) -> RedisResult<Self>;
 
     // Performs a TCP TLS connection
-    #[cfg(any(feature = "tls-native-tls", feature = "tls-rustls"))]
+    #[cfg(any(feature = "tls-rustls"))]
     async fn connect_tcp_tls(
         hostname: &str,
         socket_addr: SocketAddr,
-        insecure: bool,
-        tls_params: &Option<TlsConnParams>,
+        cfg: &crate::tls::TlsConfigRustls,
     ) -> RedisResult<Self>;
 
     /// Performs a UNIX connection

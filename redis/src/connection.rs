@@ -10,6 +10,7 @@ use std::time::Duration;
 use crate::cmd::{cmd, pipe, Cmd};
 use crate::parser::Parser;
 use crate::pipeline::Pipeline;
+use crate::tls::TlsConfigRustls;
 use crate::types::{
     from_redis_value, ErrorKind, FromRedisValue, PushKind, RedisError, RedisResult, ToRedisArgs,
     Value,
@@ -141,7 +142,7 @@ pub enum ConnectionAddr {
         insecure: bool,
 
         /// TLS certificates and client key.
-        tls_params: Option<TlsConnParams>,
+        tls_params: Option<TlsConfigRustls>,
     },
     /// Format for this is the path to the unix socket.
     Unix(PathBuf),
@@ -670,7 +671,8 @@ impl ActualConnection {
                 ref tls_params,
             } => {
                 let host: &str = host;
-                let config = create_rustls_config(insecure, tls_params.clone())?;
+                let options = tls_params.clone().and_then(|param| param.options);
+                let config = create_rustls_config(insecure, options.clone())?;
                 let conn = rustls::ClientConnection::new(
                     Arc::new(config),
                     rustls_pki_types::ServerName::try_from(host)?.to_owned(),

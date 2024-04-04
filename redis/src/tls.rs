@@ -1,9 +1,18 @@
-use std::io::{BufRead, Error, ErrorKind as IOErrorKind};
+use std::{
+    fmt,
+    io::{BufRead, Error, ErrorKind as IOErrorKind},
+    sync::Arc,
+};
 
 use rustls::RootCertStore;
 use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+use tokio::net::unix::SocketAddr;
+use tokio_rustls::{TlsConnector, TlsStream};
 
-use crate::{Client, ConnectionAddr, ConnectionInfo, ErrorKind, RedisError, RedisResult};
+use crate::{
+    connection::create_rustls_config, Client, ConnectionAddr, ConnectionInfo, ErrorKind,
+    RedisError, RedisResult,
+};
 
 /// Structure to hold mTLS client _certificate_ and _key_ binaries in PEM format
 ///
@@ -31,7 +40,8 @@ pub(crate) fn inner_build_with_tls(
     mut connection_info: ConnectionInfo,
     certificates: TlsCertificates,
 ) -> RedisResult<Client> {
-    let tls_params = retrieve_tls_certificates(certificates)?;
+    let certs = retrieve_tls_certificates(certificates)?;
+    let tls_params = TlsConfigRustls::new(true, Some(certs))?;
 
     connection_info.addr = if let ConnectionAddr::TcpTls {
         host,
@@ -139,4 +149,30 @@ impl Clone for ClientTlsParams {
 pub struct TlsConnParams {
     pub(crate) client_tls_params: Option<ClientTlsParams>,
     pub(crate) root_cert_store: Option<RootCertStore>,
+}
+
+#[derive(Clone)]
+pub struct TlsConfigRustls {
+    pub(crate) connector: TlsConnector,
+    pub(crate) options: Option<TlsConnParams>,
+}
+
+impl fmt::Debug for TlsConfigRustls {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "TlsConfigRustls {{ connector: DummyConnector }}")
+    }
+}
+
+impl TlsConfigRustls {
+    /// Create a new `TlsConfig` from the provided options from the user.
+    /// This operation is expensive, so the resultant `TlsConfig` should be cached.
+    pub(crate) fn new(
+        insecure: bool,
+        options: Option<TlsConnParams>,
+    ) -> RedisResult<TlsConfigRustls> {
+        let config = create_rustls_config(insecure, options.clone())?;
+
+        let connector: TlsConnector = Arc::new(config).into();
+        Ok(TlsConfigRustls { connector, options })
+    }
 }
