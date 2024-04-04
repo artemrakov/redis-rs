@@ -51,6 +51,8 @@ async fn connect_tcp(addr: &SocketAddr) -> io::Result<TcpStreamTokio> {
         let socket2: socket2::Socket = std_socket.into();
         socket2.set_tcp_keepalive(&KEEP_ALIVE)?;
         socket2.set_recv_buffer_size(25_000_000)?;
+        socket2.set_send_buffer_size(25_000_000)?;
+        println!("Redis");
 
         TcpStreamTokio::from_std(socket2.into())
     }
