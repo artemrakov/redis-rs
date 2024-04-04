@@ -11,6 +11,7 @@ use crate::connection::{
 };
 #[cfg(any(feature = "tokio-comp", feature = "async-std-comp"))]
 use crate::parser::ValueCodec;
+use crate::tls::TlsConfigRustls;
 use crate::types::{ErrorKind, FromRedisValue, RedisError, RedisFuture, RedisResult, Value};
 use crate::{from_owned_redis_value, ProtocolVersion, ToRedisArgs};
 #[cfg(all(not(feature = "tokio-comp"), feature = "async-std-comp"))]
@@ -457,6 +458,7 @@ pub(crate) async fn connect_simple<T: RedisRuntime>(
             ref tls_params,
         } => {
             let socket_addrs = get_socket_addrs(host, port).await?;
+
             select_ok(socket_addrs.map(|socket_addr| {
                 <T>::connect_tcp_tls(host, socket_addr, tls_params.as_ref().expect("to exist"))
             }))

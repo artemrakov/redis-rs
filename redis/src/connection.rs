@@ -328,7 +328,7 @@ fn url_to_tcp_connection_info(url: url::Url) -> RedisResult<ConnectionInfo> {
                     host,
                     port,
                     insecure: true,
-                    tls_params: None,
+                    tls_params: Some(TlsConfigRustls::new(true, None).expect("not to fail")),
                 },
                 Some(_) => fail!((
                     ErrorKind::InvalidClientConfig,
